@@ -16,7 +16,7 @@ function Login({ setAuth }) {
       setAuth({ token: res.data.token, user: res.data.user });
       navigate('/dashboard');
     } catch (err) {
-      alert('Erreur de connexion');
+     alert(err.message);
     }
   };
 

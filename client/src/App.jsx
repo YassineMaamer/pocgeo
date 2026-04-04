@@ -1,16 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './Login';
 import Dashboard from './Dashboard';
 
 function App() {
-  const [auth, setAuth] = useState(null);
+  
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
-    if (token && user) setAuth({ token, user: JSON.parse(user) });
-  }, []);
+ const [auth, setAuth] = useState(() => {
+  const token = localStorage.getItem('token');
+  const user = localStorage.getItem('user');
+
+  return token && user
+    ? { token, user: JSON.parse(user) }
+    : null;
+});
 
   const handleLogout = () => {
     localStorage.clear();

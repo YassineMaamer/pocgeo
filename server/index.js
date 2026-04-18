@@ -120,12 +120,68 @@ app.get('/api/radios-by-group/:groupid', async (req, res) => {
 });
 
 app.get('/api/groups', async (req, res) => {
-  try {    const query = 'SELECT * FROM radio_groups';
+  try {
+    const query = 'SELECT * FROM radio_groups';
     const result = await pool.query(query);
     res.json(result.rows);
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Erreur du serveur');
+  }
+});
+
+app.post('/api/groups', async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Le nom du groupe est requis' });
+    }
+
+    const query = 'INSERT INTO radio_groups (name) VALUES ($1) RETURNING *';
+    const result = await pool.query(query, [name.trim()]);
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: 'Erreur lors de la création du groupe' });
+  }
+});
+
+app.post('/api/radios', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { imei, name, group_id, latitude, longitude } = req.body;
+    
+    if (!imei || !imei.trim()) {
+      return res.status(400).json({ error: 'L\'IMEI de la radio est requis' });
+    }
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Le nom de la radio est requis' });
+    }
+    if (!group_id) {
+      return res.status(400).json({ error: 'L\'ID du groupe est requis' });
+    }
+
+    await client.query('BEGIN');
+
+    // Insert the radio
+    const radioQuery = 'INSERT INTO radios (imei, name, group_id) VALUES ($1, $2, $3) RETURNING *';
+    const radioResult = await client.query(radioQuery, [imei.trim(), name.trim(), group_id]);
+    const radioId = radioResult.rows[0].id;
+
+    // If position is provided, insert it in radio_positions
+    if (latitude && longitude) {
+      const posQuery = 'INSERT INTO radio_positions (radio_id, latitude, longitude, signal_quality, battery_level) VALUES ($1, $2, $3, $4, $5)';
+      await client.query(posQuery, [radioId, latitude, longitude, 0, 100]);
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json(radioResult.rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err.message);
+    res.status(500).json({ error: 'Erreur lors de la création de la radio' });
+  } finally {
+    client.release();
   }
 });
 

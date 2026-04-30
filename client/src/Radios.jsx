@@ -5,6 +5,7 @@ const RadiosList = ({ onSelectRadio }) => {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
   const [groups, setGroups] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Fetch radios
   const fetchRadios = async () => {
@@ -49,9 +50,33 @@ const RadiosList = ({ onSelectRadio }) => {
 
   if (loading) return <p>Chargement des radios...</p>;
 
+  // Filter radios based on search query
+  const filteredRadios = radios.filter((radio) =>
+    radio.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h2 style={{ color: '#333', marginBottom: '20px' }}>Liste des Radios</h2>
+
+      {/* Search Bar */}
+      <div style={{ marginBottom: '20px' }}>
+        <input
+          type="text"
+          placeholder="Rechercher une radio..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '10px 15px',
+            fontSize: '14px',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            boxSizing: 'border-box',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}
+        />
+      </div>
 
       <table
         style={{
@@ -72,7 +97,8 @@ const RadiosList = ({ onSelectRadio }) => {
         </thead>
 
         <tbody>
-          {radios.map((radio, index) => (
+          {filteredRadios.length > 0 ? (
+            filteredRadios.map((radio, index) => (
             <tr
               key={radio.id}
               onClick={() => handleClick(radio)}
@@ -142,7 +168,14 @@ const RadiosList = ({ onSelectRadio }) => {
                 </div>
               </td>
             </tr>
-          ))}
+            ))
+          ) : (
+            <tr>
+              <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+                Aucune radio trouvée
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>

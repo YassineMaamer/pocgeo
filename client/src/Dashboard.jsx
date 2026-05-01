@@ -1,8 +1,8 @@
 import { useState } from 'react';
+import { LayoutDashboard, Radio, Settings, Users, LogOut } from 'lucide-react';
 import MapComponent from './MapComponent';
 import AdminPanel from './AdminPanel';
 import RadiosList from './Radios';
-import RadioPositions from './RadioPositions';
 import Groups from './Groups';
 import DashboardHome from './DashboardHome';
 
@@ -10,7 +10,7 @@ function Dashboard({ auth, onLogout }) {
   const [selectedRadio, setSelectedRadio] = useState(null);
   const [activeSection, setActiveSection] = useState('dashboard');
 
-  const isMapVisible = activeSection === 'radios' || activeSection === 'positions';
+  const isMapVisible = activeSection === 'radios';
 
   const sectionButtonStyle = (active) => ({
     width: '100%',
@@ -24,6 +24,9 @@ function Dashboard({ auth, onLogout }) {
     color: active ? 'white' : '#cbd5e1',
     fontWeight: active ? '700' : '600',
     transition: 'background 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
   });
 
   const groupTitleStyle = {
@@ -37,7 +40,6 @@ function Dashboard({ auth, onLogout }) {
   const sectionTitles = {
     dashboard: 'Tableau de bord',
     radios: 'Radios',
-    positions: 'Positions',
     admin: 'Administration',
     groups: 'Groupes',
   };
@@ -66,19 +68,13 @@ function Dashboard({ auth, onLogout }) {
             style={sectionButtonStyle(activeSection === 'dashboard')}
             onClick={() => setActiveSection('dashboard')}
           >
-            Dashboard
+            <LayoutDashboard size={18} /> Dashboard
           </button>
           <button
             style={sectionButtonStyle(activeSection === 'radios')}
             onClick={() => setActiveSection('radios')}
           >
-            Radios
-          </button>
-          <button
-            style={sectionButtonStyle(activeSection === 'positions')}
-            onClick={() => setActiveSection('positions')}
-          >
-            Positions
+            <Radio size={18} /> Radios
           </button>
         </div>
 
@@ -89,13 +85,13 @@ function Dashboard({ auth, onLogout }) {
               style={sectionButtonStyle(activeSection === 'admin')}
               onClick={() => setActiveSection('admin')}
             >
-              Gestion admin
+              <Settings size={18} /> Gestion admin
             </button>
             <button
               style={sectionButtonStyle(activeSection === 'groups')}
               onClick={() => setActiveSection('groups')}
             >
-              Groupes
+              <Users size={18} /> Groupes
             </button>
           </div>
         )}
@@ -136,9 +132,12 @@ function Dashboard({ auth, onLogout }) {
               border: 'none',
               borderRadius: '12px',
               fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
             }}
           >
-            Déconnexion
+            <LogOut size={18} /> Déconnexion
           </button>
         </div>
 
@@ -152,7 +151,6 @@ function Dashboard({ auth, onLogout }) {
         {activeSection === 'radios' && (
           <RadiosList onSelectRadio={setSelectedRadio} />
         )}
-        {activeSection === 'positions' && <RadioPositions />}
       </div>
 
       {/* Map */}

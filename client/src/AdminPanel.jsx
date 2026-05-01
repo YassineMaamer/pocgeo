@@ -65,7 +65,7 @@ function AdminPanel({ token, refresh }) {
       border: '1px solid #ddd',
       borderRadius: '8px',
       boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-      fontFamily: 'Arial, sans-serif'
+      fontFamily: 'inherit'
     }}>
       <h3 style={{ color: '#333', marginTop: 0 }}>Ajouter une radio</h3>
       

@@ -132,13 +132,13 @@ app.get('/api/groups', async (req, res) => {
 
 app.post('/api/groups', async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, description } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Le nom du groupe est requis' });
     }
 
-    const query = 'INSERT INTO radio_groups (name) VALUES ($1) RETURNING *';
-    const result = await pool.query(query, [name.trim()]);
+    const query = 'INSERT INTO radio_groups (name, description) VALUES ($1, $2) RETURNING *';
+    const result = await pool.query(query, [name.trim(), description ? description.trim() : null]);
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err.message);

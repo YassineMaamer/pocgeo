@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 function Groups() {
   const [groups, setGroups] = useState([]);
   const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupDescription, setNewGroupDescription] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -37,7 +38,10 @@ function Groups() {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ name: newGroupName.trim() })
+        body: JSON.stringify({ 
+          name: newGroupName.trim(),
+          description: newGroupDescription.trim()
+        })
       });
 
       if (!response.ok) {
@@ -46,6 +50,7 @@ function Groups() {
       }
 
       setNewGroupName('');
+      setNewGroupDescription('');
       setMessage('Groupe créé avec succès !');
       fetchGroups();
     } catch (error) {
@@ -65,17 +70,23 @@ function Groups() {
 
       <div style={{ marginBottom: '24px', padding: '18px', background: '#fff', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
         <h3 style={{ marginTop: 0 }}>Ajouter un groupe</h3>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <input
             type="text"
             placeholder="Nom du groupe"
             value={newGroupName}
             onChange={(e) => { setNewGroupName(e.target.value); setMessage(''); }}
-            style={{ flex: '1', minWidth: '220px', padding: '10px', borderRadius: '8px', border: '1px solid #ced4da' }}
+            style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ced4da' }}
+          />
+          <textarea
+            placeholder="Description (optionnelle)"
+            value={newGroupDescription}
+            onChange={(e) => { setNewGroupDescription(e.target.value); setMessage(''); }}
+            style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ced4da', resize: 'vertical', minHeight: '80px', fontFamily: 'inherit' }}
           />
           <button
             onClick={handleAddGroup}
-            style={{ padding: '10px 18px', borderRadius: '8px', border: 'none', backgroundColor: '#0d6efd', color: 'white', cursor: 'pointer' }}
+            style={{ padding: '10px 18px', borderRadius: '8px', border: 'none', backgroundColor: '#0d6efd', color: 'white', cursor: 'pointer', alignSelf: 'flex-start' }}
           >
             Ajouter
           </button>

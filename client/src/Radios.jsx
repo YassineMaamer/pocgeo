@@ -90,6 +90,7 @@ const RadiosList = ({ onSelectRadio }) => {
         <thead>
           <tr style={{ backgroundColor: '#f8f9fa' }}>
             <th style={thStyle}>Nom</th>
+            <th style={thStyle}>IMEI</th>
             <th style={thStyle}>Statut</th>
             <th style={thStyle}>Groupe</th>
             <th style={thStyle}>Batterie</th>
@@ -115,6 +116,9 @@ const RadiosList = ({ onSelectRadio }) => {
             >
               {/* Nom */}
               <td style={tdStyle}>{radio.name}</td>
+
+              {/* IMEI */}
+              <td style={tdStyle}>{radio.imei || '—'}</td>
 
               {/* Statut */}
               <td style={tdStyle}>
@@ -171,7 +175,7 @@ const RadiosList = ({ onSelectRadio }) => {
             ))
           ) : (
             <tr>
-              <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+              <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
                 Aucune radio trouvée
               </td>
             </tr>

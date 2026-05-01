@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Radio, Wifi, Users, AlertTriangle } from 'lucide-react';
 
 function DashboardHome({ auth }) {
   const [radios, setRadios] = useState([]);
@@ -101,25 +102,25 @@ function DashboardHome({ auth }) {
       label: 'Radios totales',
       value: totalRadios,
       accent: '#8b5cf6',
-      icon: '📻',
+      icon: <Radio size={24} />,
     },
     {
       label: 'Radios en ligne',
       value: onlineRadios || positions.length,
       accent: '#22c55e',
-      icon: '🟢',
+      icon: <Wifi size={24} />,
     },
     {
       label: 'Groupes actifs',
       value: groups.length,
       accent: '#0ea5e9',
-      icon: '👥',
+      icon: <Users size={24} />,
     },
     {
       label: 'Alertes détectées',
       value: alertCount,
       accent: '#ef4444',
-      icon: '⚠️',
+      icon: <AlertTriangle size={24} />,
     },
   ];
 

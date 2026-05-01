@@ -10,53 +10,58 @@ function Dashboard({ auth, onLogout }) {
   const [selectedRadio, setSelectedRadio] = useState(null);
   const [activeSection, setActiveSection] = useState('dashboard');
 
-  const isMapVisible =
-    activeSection === 'radios' || activeSection === 'positions';
+  const isMapVisible = activeSection === 'radios' || activeSection === 'positions';
 
   const sectionButtonStyle = (active) => ({
     width: '100%',
     marginBottom: '10px',
-    padding: '12px 14px',
+    padding: '14px 16px',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '12px',
     textAlign: 'left',
     cursor: 'pointer',
-    background: active ? '#0d6efd' : 'transparent',
-    color: active ? 'white' : '#f8f9fa',
-    fontWeight: active ? '700' : '500',
+    background: active ? '#2563eb' : 'transparent',
+    color: active ? 'white' : '#cbd5e1',
+    fontWeight: active ? '700' : '600',
+    transition: 'background 0.2s ease',
   });
 
   const groupTitleStyle = {
     margin: '0 0 12px 0',
     fontSize: '12px',
-    letterSpacing: '1px',
+    letterSpacing: '0.18em',
     textTransform: 'uppercase',
-    color: '#6c757d',
+    color: '#94a3b8',
+  };
+
+  const sectionTitles = {
+    dashboard: 'Tableau de bord',
+    radios: 'Radios',
+    positions: 'Positions',
+    admin: 'Administration',
+    groups: 'Groupes',
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh' }}>
-      
-      {/* Sidebar */}
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#f1f5f9' }}>
       <div
         style={{
-          width: '220px',
-          padding: '20px',
-          background: '#343a40',
+          width: '250px',
+          padding: '26px',
+          background: '#1e293b',
           color: 'white',
           display: 'flex',
           flexDirection: 'column',
+          boxShadow: '8px 0 24px rgba(15, 23, 42, 0.12)',
         }}
       >
-        <div style={{ marginBottom: '30px' }}>
-          <h2 style={{ margin: 0, fontSize: '20px' }}>Navigation</h2>
-          <p style={{ margin: '8px 0 0 0', color: '#ced4da' }}>
-            Tableau de bord
-          </p>
+        <div style={{ marginBottom: '32px' }}>
+          <h2 style={{ margin: 0, fontSize: '24px' }}>POC Geo</h2>
+          <p style={{ margin: '10px 0 0', color: '#94a3b8', fontSize: '14px' }}>Gérez vos radios et positions</p>
         </div>
 
-        <div style={{ marginBottom: '24px' }}>
-          <p style={groupTitleStyle}>Données</p>
+        <div style={{ marginBottom: '26px' }}>
+          <p style={groupTitleStyle}>Navigation</p>
           <button
             style={sectionButtonStyle(activeSection === 'dashboard')}
             onClick={() => setActiveSection('dashboard')}
@@ -77,14 +82,14 @@ function Dashboard({ auth, onLogout }) {
           </button>
         </div>
 
-        {auth.user.role === 'admin' && (
-          <div style={{ marginBottom: '24px' }}>
+        {auth.user?.role === 'admin' && (
+          <div style={{ marginBottom: '26px' }}>
             <p style={groupTitleStyle}>Administration</p>
             <button
               style={sectionButtonStyle(activeSection === 'admin')}
               onClick={() => setActiveSection('admin')}
             >
-              Gestion Admin
+              Gestion admin
             </button>
             <button
               style={sectionButtonStyle(activeSection === 'groups')}
@@ -95,26 +100,18 @@ function Dashboard({ auth, onLogout }) {
           </div>
         )}
 
-        <div
-          style={{
-            marginTop: 'auto',
-            fontSize: '14px',
-            color: '#adb5bd',
-          }}
-        >
-          <strong>{auth.user.name || auth.user.email}</strong>
-          <p style={{ margin: '8px 0 0 0' }}>{auth.user.role}</p>
+        <div style={{ marginTop: 'auto', fontSize: '14px', color: '#cbd5e1' }}>
+          <strong>{auth.user?.name || auth.user?.email}</strong>
+          <p style={{ margin: '8px 0 0', color: '#94a3b8' }}>{auth.user?.role || 'Utilisateur'}</p>
         </div>
       </div>
 
-      {/* Main Content */}
       <div
         style={{
-          width: isMapVisible ? '36%' : '100%',
-          padding: '20px',
+          width: isMapVisible ? '38%' : '100%',
+          padding: '26px',
           overflowY: 'auto',
-          background: '#f8f9fa',
-          transition: 'all 0.3s ease',
+          transition: 'width 0.3s ease',
         }}
       >
         <div
@@ -122,24 +119,23 @@ function Dashboard({ auth, onLogout }) {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '20px',
+            marginBottom: '24px',
           }}
         >
           <div>
-            <h1 style={{ margin: 0 }}>Tableau de bord</h1>
-            <p style={{ margin: '8px 0 0 0' }}>
-              Section {activeSection}
-            </p>
+            <h1 style={{ margin: 0, fontSize: '32px', color: '#0f172a' }}>{sectionTitles[activeSection]}</h1>
+            <p style={{ margin: '10px 0 0', color: '#64748b' }}>Vue détaillée pour {sectionTitles[activeSection].toLowerCase()}.</p>
           </div>
 
           <button
             onClick={onLogout}
             style={{
-              padding: '8px 14px',
-              background: '#dc3545',
+              padding: '10px 16px',
+              background: '#ef4444',
               color: 'white',
               border: 'none',
-              borderRadius: '6px',
+              borderRadius: '12px',
+              fontWeight: 700,
             }}
           >
             Déconnexion
@@ -163,8 +159,8 @@ function Dashboard({ auth, onLogout }) {
       {isMapVisible && (
         <div
           style={{
-            width: '64%',
-            transition: 'all 0.3s ease',
+            width: '50%',
+            transition: 'width 0.3s ease',
           }}
         >
           <MapComponent selectedRadio={selectedRadio} />

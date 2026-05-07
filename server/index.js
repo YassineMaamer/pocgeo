@@ -187,6 +187,60 @@ app.post('/api/radios', async (req, res) => {
 
 
 
+// PUT route to update a radio
+app.put('/api/radios/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, imei, group_id, status, battery_level } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Le nom de la radio est requis' });
+    }
+    if (!imei || !imei.trim()) {
+      return res.status(400).json({ error: 'L\'IMEI de la radio est requis' });
+    }
+    if (!group_id) {
+      return res.status(400).json({ error: 'L\'ID du groupe est requis' });
+    }
+
+    const query = 'UPDATE radios SET name = $1, imei = $2, group_id = $3, status = $4, battery_level = $5 WHERE id = $6 RETURNING *';
+    const result = await pool.query(query, [name.trim(), imei.trim(), group_id, status || 'inactive', battery_level || 0, id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Radio non trouvée' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: 'Erreur lors de la mise à jour de la radio' });
+  }
+});
+
+// DELETE route to delete a radio
+app.delete('/api/radios/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // First delete related positions
+    await pool.query('DELETE FROM radio_positions WHERE radio_id = $1', [id]);
+
+    // Then delete the radio
+    const result = await pool.query('DELETE FROM radios WHERE id = $1 RETURNING *', [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Radio non trouvée' });
+    }
+
+    res.json({ message: 'Radio supprimée avec succès' });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: 'Erreur lors de la suppression de la radio' });
+  }
+});
+
+
+
 
 
 

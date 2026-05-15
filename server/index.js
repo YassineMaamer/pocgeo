@@ -68,11 +68,24 @@ app.post("/api/login", async (req, res) => {
 
 app.get('/api/radios', async (req, res) => {
   try {
-    const query = 'SELECT * FROM radios';
-    const result = await pool.query(query); // PostgreSQL
-    // const [rows] = await pool.query(query); // MySQL
-    res.json(result.rows); // PostgreSQL
-    // res.json(rows); // MySQL
+    const { userId } = req.query;
+    let query = 'SELECT * FROM radios';
+    let params = [];
+
+    if (userId) {
+      const userRes = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
+      if (userRes.rows.length > 0 && userRes.rows[0].role === 'client') {
+        query = `
+          SELECT r.* 
+          FROM radios r
+          JOIN user_groups ug ON r.group_id = ug.group_id
+          WHERE ug.user_id = $1
+        `;
+        params = [userId];
+      }
+    }
+    const result = await pool.query(query, params);
+    res.json(result.rows);
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Erreur du serveur');
@@ -83,11 +96,25 @@ app.get('/api/radios', async (req, res) => {
 // Route pour récupérer toutes les positions
 app.get('/api/radio-positions', async (req, res) => {
   try {
-    const query = 'SELECT * FROM radio_positions';
-    const result = await pool.query(query); // PostgreSQL
-    // const [rows] = await pool.query(query); // MySQL
-    res.json(result.rows); // PostgreSQL
-    // res.json(rows); // MySQL
+    const { userId } = req.query;
+    let query = 'SELECT * FROM radio_positions';
+    let params = [];
+
+    if (userId) {
+      const userRes = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
+      if (userRes.rows.length > 0 && userRes.rows[0].role === 'client') {
+        query = `
+          SELECT p.* 
+          FROM radio_positions p
+          JOIN radios r ON p.radio_id = r.id
+          JOIN user_groups ug ON r.group_id = ug.group_id
+          WHERE ug.user_id = $1
+        `;
+        params = [userId];
+      }
+    }
+    const result = await pool.query(query, params);
+    res.json(result.rows);
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Erreur du serveur');
@@ -121,8 +148,23 @@ app.get('/api/radios-by-group/:groupid', async (req, res) => {
 
 app.get('/api/groups', async (req, res) => {
   try {
-    const query = 'SELECT * FROM radio_groups';
-    const result = await pool.query(query);
+    const { userId } = req.query;
+    let query = 'SELECT * FROM radio_groups';
+    let params = [];
+
+    if (userId) {
+      const userRes = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
+      if (userRes.rows.length > 0 && userRes.rows[0].role === 'client') {
+        query = `
+          SELECT g.* 
+          FROM radio_groups g
+          JOIN user_groups ug ON g.id = ug.group_id
+          WHERE ug.user_id = $1
+        `;
+        params = [userId];
+      }
+    }
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) {
     console.error(err.message);
@@ -131,20 +173,88 @@ app.get('/api/groups', async (req, res) => {
 });
 
 app.post('/api/groups', async (req, res) => {
+  const client = await pool.connect();
   try {
     const { name, description } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Le nom du groupe est requis' });
     }
 
+    await client.query('BEGIN');
     const query = 'INSERT INTO radio_groups (name, description) VALUES ($1, $2) RETURNING *';
-    const result = await pool.query(query, [name.trim(), description ? description.trim() : null]);
-    res.status(201).json(result.rows[0]);
+    const result = await client.query(query, [name.trim(), description ? description.trim() : null]);
+    const newGroup = result.rows[0];
+
+    // link to all admins
+    await client.query(`
+      INSERT INTO user_groups (user_id, group_id)
+      SELECT id, $1 FROM users WHERE role = 'admin'
+      ON CONFLICT DO NOTHING
+    `, [newGroup.id]);
+
+    await client.query('COMMIT');
+    res.status(201).json(newGroup);
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error(err.message);
     res.status(500).json({ error: 'Erreur lors de la création du groupe' });
+  } finally {
+    client.release();
   }
 });
+
+app.delete('/api/groups/:id', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+
+    await client.query('BEGIN');
+
+    // Get the group being deleted
+    const groupResult = await client.query('SELECT * FROM radio_groups WHERE id = $1', [id]);
+    if (groupResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Groupe non trouvé' });
+    }
+
+    if (groupResult.rows[0].name.toLowerCase() === 'default') {
+       await client.query('ROLLBACK');
+       return res.status(400).json({ error: 'Impossible de supprimer le groupe par défaut' });
+    }
+
+    // Check if there are radios in this group
+    const radiosResult = await client.query('SELECT id FROM radios WHERE group_id = $1', [id]);
+    
+    if (radiosResult.rows.length > 0) {
+      // Find or create 'default' group
+      let defaultGroupRes = await client.query('SELECT id FROM radio_groups WHERE LOWER(name) = $1', ['default']);
+      let defaultGroupId;
+
+      if (defaultGroupRes.rows.length === 0) {
+        const insertDefault = await client.query('INSERT INTO radio_groups (name, description) VALUES ($1, $2) RETURNING id', ['default', 'Groupe par défaut']);
+        defaultGroupId = insertDefault.rows[0].id;
+      } else {
+        defaultGroupId = defaultGroupRes.rows[0].id;
+      }
+
+      // Move radios to default group
+      await client.query('UPDATE radios SET group_id = $1 WHERE group_id = $2', [defaultGroupId, id]);
+    }
+
+    // Delete the group
+    await client.query('DELETE FROM radio_groups WHERE id = $1', [id]);
+
+    await client.query('COMMIT');
+    res.json({ message: 'Groupe supprimé avec succès' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err.message);
+    res.status(500).json({ error: 'Erreur lors de la suppression du groupe' });
+  } finally {
+    client.release();
+  }
+});
+
 
 app.post('/api/radios', async (req, res) => {
   const client = await pool.connect();
@@ -237,10 +347,65 @@ app.delete('/api/radios/:id', async (req, res) => {
     console.error(err.message);
     res.status(500).json({ error: 'Erreur lors de la suppression de la radio' });
   }
+});// GET route to fetch clients
+app.get('/api/clients', async (req, res) => {
+  try {
+    const query = `
+      SELECT u.id, u.name, u.email, u.password_hash, u.role, u.created_at,
+             COALESCE(json_agg(ug.group_id) FILTER (WHERE ug.group_id IS NOT NULL), '[]') as group_ids
+      FROM users u
+      LEFT JOIN user_groups ug ON u.id = ug.user_id
+      WHERE u.role = 'client'
+      GROUP BY u.id
+    `;
+    const result = await pool.query(query);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: 'Erreur lors de la récupération des clients' });
+  }
 });
 
+// POST route to create a client
+app.post('/api/clients', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { name, email, password, group_ids } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Le login du client est requis' });
+    if (!email || !email.trim()) return res.status(400).json({ error: "L'email du client est requis" });
+    if (!password || !password.trim()) return res.status(400).json({ error: 'Le mot de passe est requis' });
+    
+    await client.query('BEGIN');
+    
+    // Check if user already exists
+    const existing = await client.query('SELECT id FROM users WHERE name = $1 OR email = $2', [name.trim(), email.trim()]);
+    if (existing.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: "Ce nom d'utilisateur ou cet email existe déjà" });
+    }
 
+    // Insert user
+    const userQuery = 'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, name, role';
+    const userResult = await client.query(userQuery, [name.trim(), email.trim(), password.trim(), 'client']);
+    const userId = userResult.rows[0].id;
 
+    // Insert user groups
+    if (group_ids && Array.isArray(group_ids) && group_ids.length > 0) {
+      for (const groupId of group_ids) {
+        await client.query('INSERT INTO user_groups (user_id, group_id) VALUES ($1, $2)', [userId, groupId]);
+      }
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json(userResult.rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err.message);
+    res.status(500).json({ error: 'Erreur lors de la création du client' });
+  } finally {
+    client.release();
+  }
+});
 
 
 

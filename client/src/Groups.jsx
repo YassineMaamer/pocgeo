@@ -7,6 +7,9 @@ function Groups() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
 
+  const user = JSON.parse(localStorage.getItem('user')) || {};
+  const isAdmin = user.role === 'admin';
+
   const fetchGroups = async () => {
     try {
       setLoading(true);
@@ -59,6 +62,29 @@ function Groups() {
     }
   };
 
+  const handleDeleteGroup = async (id) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce groupe ? Si des radios y sont assignées, elles seront déplacées vers le groupe "default".')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/groups/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erreur lors de la suppression du groupe');
+      }
+
+      setMessage('Groupe supprimé avec succès !');
+      fetchGroups();
+    } catch (error) {
+      console.error(error);
+      setMessage(error.message || 'Erreur lors de la suppression du groupe.');
+    }
+  };
+
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -103,9 +129,19 @@ function Groups() {
         ) : (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {groups.map((group) => (
-              <li key={group.id} style={{ padding: '12px 0', borderBottom: '1px solid #e9ecef' }}>
-                <strong>{group.name}</strong>
-                {group.description && <p style={{ margin: '6px 0 0 0', color: '#6c757d' }}>{group.description}</p>}
+              <li key={group.id} style={{ padding: '12px 0', borderBottom: '1px solid #e9ecef', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <strong>{group.name}</strong>
+                  {group.description && <p style={{ margin: '6px 0 0 0', color: '#6c757d' }}>{group.description}</p>}
+                </div>
+                {isAdmin && group.name.toLowerCase() !== 'default' && (
+                  <button
+                    onClick={() => handleDeleteGroup(group.id)}
+                    style={{ padding: '6px 12px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                  >
+                    Supprimer
+                  </button>
+                )}
               </li>
             ))}
           </ul>

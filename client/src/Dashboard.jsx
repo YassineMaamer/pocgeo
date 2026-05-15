@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { LayoutDashboard, Radio, Settings, Users, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Radio, Settings, Users, LogOut, ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
 import MapComponent from './MapComponent';
 import AdminPanel from './AdminPanel';
 import RadiosList from './Radios';
 import Groups from './Groups';
 import DashboardHome from './DashboardHome';
+import Clients from './Clients';
 
 function Dashboard({ auth, onLogout }) {
   const [selectedRadio, setSelectedRadio] = useState(null);
@@ -44,6 +45,7 @@ function Dashboard({ auth, onLogout }) {
     radios: 'Radios',
     admin: 'Administration',
     groups: 'Groupes',
+    clients: 'Clients',
   };
 
   return (
@@ -123,6 +125,13 @@ function Dashboard({ auth, onLogout }) {
             >
               <Users size={18} /> {!sidebarCollapsed && 'Groupes'}
             </button>
+            <button
+              style={sectionButtonStyle(activeSection === 'clients')}
+              onClick={() => setActiveSection('clients')}
+              title={sidebarCollapsed ? 'Clients' : ''}
+            >
+              <UserPlus size={18} /> {!sidebarCollapsed && 'Clients'}
+            </button>
           </div>
         )}
 
@@ -179,8 +188,11 @@ function Dashboard({ auth, onLogout }) {
         {activeSection === 'groups' && auth.user.role === 'admin' && (
           <Groups />
         )}
+        {activeSection === 'clients' && auth.user.role === 'admin' && (
+          <Clients />
+        )}
         {activeSection === 'radios' && (
-          <RadiosList onSelectRadio={setSelectedRadio} />
+          <RadiosList auth={auth} onSelectRadio={setSelectedRadio} />
         )}
       </div>
 
@@ -192,7 +204,7 @@ function Dashboard({ auth, onLogout }) {
             transition: 'width 0.3s ease',
           }}
         >
-          <MapComponent selectedRadio={selectedRadio} />
+          <MapComponent auth={auth} selectedRadio={selectedRadio} />
         </div>
       )}
     </div>

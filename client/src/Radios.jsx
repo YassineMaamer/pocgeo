@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-const RadiosList = ({ onSelectRadio }) => {
+const RadiosList = ({ auth, onSelectRadio }) => {
   const [radios, setRadios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
@@ -19,7 +19,8 @@ const RadiosList = ({ onSelectRadio }) => {
   // Fetch radios
   const fetchRadios = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/radios');
+      const userIdParam = auth?.user?.id ? `?userId=${auth.user.id}` : '';
+      const response = await fetch(`http://localhost:5000/api/radios${userIdParam}`);
       if (!response.ok) throw new Error('Erreur lors de la récupération');
       const data = await response.json();
       setRadios(data);
@@ -36,7 +37,8 @@ const RadiosList = ({ onSelectRadio }) => {
 
   const fetchGroups = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/groups');
+      const userIdParam = auth?.user?.id ? `?userId=${auth.user.id}` : '';
+      const response = await fetch(`http://localhost:5000/api/groups${userIdParam}`);
       if (!response.ok) throw new Error('Erreur lors de la récupération des groupes');
       const data = await response.json();
       setGroups(data);

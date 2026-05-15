@@ -31,7 +31,7 @@ let DefaultIcon = L.icon({
 L.Marker.prototype.options.icon = DefaultIcon;
 
 // 🔥 IMPORTANT: recevoir selectedRadio
-function MapComponent({ selectedRadio }) {
+function MapComponent({ auth, selectedRadio }) {
 
   const [positions, setPositions] = useState([]);
 
@@ -39,11 +39,12 @@ function MapComponent({ selectedRadio }) {
 
   // Fetch
   useEffect(() => {
-    fetch('http://localhost:5000/api/radio-positions')
+    const userIdParam = auth?.user?.id ? `?userId=${auth.user.id}` : '';
+    fetch(`http://localhost:5000/api/radio-positions${userIdParam}`)
       .then(res => res.json())
       .then(data => setPositions(data))
       .catch(err => console.error(err));
-  }, []);
+  }, [auth]);
 
   // ✅ نحسب position مباشرة (بدون state)
   const selectedPosition = (() => {

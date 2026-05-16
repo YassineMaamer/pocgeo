@@ -6,6 +6,8 @@ const RadiosList = ({ auth, onSelectRadio }) => {
   const [selectedId, setSelectedId] = useState(null);
   const [groups, setGroups] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [groupFilter, setGroupFilter] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingRadio, setEditingRadio] = useState(null);
   const [editForm, setEditForm] = useState({
@@ -129,24 +131,32 @@ const RadiosList = ({ auth, onSelectRadio }) => {
 
   if (loading) return <p>Chargement des radios...</p>;
 
-  // Filter radios based on search query
-  const filteredRadios = radios.filter((radio) =>
-    radio.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter radios based on search query and filters
+  const filteredRadios = radios.filter((radio) => {
+    const query = searchQuery.toLowerCase();
+    const matchName = radio.name?.toLowerCase().includes(query);
+    const matchImei = radio.imei?.toLowerCase().includes(query);
+    const matchSearch = matchName || matchImei;
+
+    const matchStatus = statusFilter ? radio.status === statusFilter : true;
+    const matchGroup = groupFilter ? radio.group_id?.toString() === groupFilter : true;
+
+    return matchSearch && matchStatus && matchGroup;
+  });
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h2 style={{ color: '#333', marginBottom: '20px' }}>Liste des Radios</h2>
 
-      {/* Search Bar */}
-      <div style={{ marginBottom: '20px' }}>
+      {/* Search and Filters */}
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
         <input
           type="text"
-          placeholder="Rechercher une radio..."
+          placeholder="Rechercher par nom ou IMEI..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           style={{
-            width: '100%',
+            flex: '1 1 250px',
             padding: '10px 15px',
             fontSize: '14px',
             border: '1px solid #ddd',
@@ -155,17 +165,53 @@ const RadiosList = ({ auth, onSelectRadio }) => {
             boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
           }}
         />
+
+        <select
+          value={groupFilter}
+          onChange={(e) => setGroupFilter(e.target.value)}
+          style={{
+            padding: '10px 15px',
+            fontSize: '14px',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            minWidth: '180px',
+            backgroundColor: 'white'
+          }}
+        >
+          <option value="">Tous les groupes</option>
+          {groups.map(group => (
+            <option key={group.id} value={group.id}>{group.name}</option>
+          ))}
+        </select>
+
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          style={{
+            padding: '10px 15px',
+            fontSize: '14px',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            minWidth: '180px',
+            backgroundColor: 'white'
+          }}
+        >
+          <option value="">Tous les statuts</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
       </div>
 
-      <table
-        style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          borderRadius: '8px',
-          overflow: 'hidden'
-        }}
-      >
+      <div style={{ overflowX: 'auto', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+        <table
+          style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            minWidth: '600px', // Ensure it doesn't squish too much
+          }}
+        >
         <thead>
           <tr style={{ backgroundColor: '#f8f9fa' }}>
             <th style={thStyle}>Nom</th>
@@ -173,7 +219,7 @@ const RadiosList = ({ auth, onSelectRadio }) => {
             <th style={thStyle}>Statut</th>
             <th style={thStyle}>Groupe</th>
             <th style={thStyle}>Batterie</th>
-            <th style={thStyle}>Actions</th>
+            {auth?.user?.role === 'admin' && <th style={thStyle}>Actions</th>}
           </tr>
         </thead>
 
@@ -251,35 +297,37 @@ const RadiosList = ({ auth, onSelectRadio }) => {
                   <span>{radio.battery_level}%</span>
                 </div>
               </td>
-              <td style={tdStyle}>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleEdit(radio); }}
-                  style={{
-                    padding: '6px 12px',
-                    marginRight: '5px',
-                    backgroundColor: '#007bff',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Modifier
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDelete(radio.id); }}
-                  style={{
-                    padding: '6px 12px',
-                    backgroundColor: '#dc3545',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Supprimer
-                </button>
-              </td>
+              {auth?.user?.role === 'admin' && (
+                <td style={tdStyle}>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleEdit(radio); }}
+                    style={{
+                      padding: '6px 12px',
+                      marginRight: '5px',
+                      backgroundColor: '#007bff',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Modifier
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDelete(radio.id); }}
+                    style={{
+                      padding: '6px 12px',
+                      backgroundColor: '#dc3545',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Supprimer
+                  </button>
+                </td>
+              )}
             </tr>
             ))
           ) : (
@@ -291,6 +339,7 @@ const RadiosList = ({ auth, onSelectRadio }) => {
           )}
         </tbody>
       </table>
+      </div>
 
       {/* Edit Modal */}
       {showEditModal && (

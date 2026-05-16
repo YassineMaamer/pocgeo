@@ -143,10 +143,8 @@ function Dashboard({ auth, onLogout }) {
 
       <div
         style={{
-          width: isMapVisible ? '38%' : '100%',
           padding: '26px',
           overflowY: 'auto',
-          transition: 'width 0.3s ease',
           flex: 1,
         }}
       >
@@ -200,8 +198,9 @@ function Dashboard({ auth, onLogout }) {
       {isMapVisible && (
         <div
           style={{
-            width: '50%',
+            width: '35%',
             transition: 'width 0.3s ease',
+            borderLeft: '1px solid #e2e8f0',
           }}
         >
           <MapComponent auth={auth} selectedRadio={selectedRadio} />

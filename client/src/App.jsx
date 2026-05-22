@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './Login';
 import Dashboard from './Dashboard';
+import RadioHistory from './RadioHistory';
 
 function App() {
   
@@ -25,6 +26,7 @@ function App() {
       <Routes>
         <Route path="/" element={auth ? <Navigate to="/dashboard" /> : <Login setAuth={setAuth} />} />
         <Route path="/dashboard" element={auth ? <Dashboard auth={auth} onLogout={handleLogout} /> : <Navigate to="/" />} />
+        <Route path="/radios/:id/history" element={auth ? <RadioHistory auth={auth} /> : <Navigate to="/" />} />
       </Routes>
     </BrowserRouter>
   );

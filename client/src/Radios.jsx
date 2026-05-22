@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const RadiosList = ({ auth, onSelectRadio }) => {
   const [radios, setRadios] = useState([]);
@@ -17,6 +18,8 @@ const RadiosList = ({ auth, onSelectRadio }) => {
     status: '',
     battery_level: ''
   });
+
+  const navigate = useNavigate();
 
   // Fetch radios
   const fetchRadios = async () => {
@@ -204,12 +207,12 @@ const RadiosList = ({ auth, onSelectRadio }) => {
         </select>
       </div>
 
-      <div style={{ overflowX: 'auto', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+      <div style={{ overflowX: 'auto', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', width: '100%' }}>
         <table
           style={{
             width: '100%',
             borderCollapse: 'collapse',
-            minWidth: '600px', // Ensure it doesn't squish too much
+            minWidth: '900px', // Ensure horizontal scrolling for narrow views
           }}
         >
         <thead>
@@ -219,6 +222,7 @@ const RadiosList = ({ auth, onSelectRadio }) => {
             <th style={thStyle}>Statut</th>
             <th style={thStyle}>Groupe</th>
             <th style={thStyle}>Batterie</th>
+            <th style={thStyle}>Historique</th>
             {auth?.user?.role === 'admin' && <th style={thStyle}>Actions</th>}
           </tr>
         </thead>
@@ -297,6 +301,22 @@ const RadiosList = ({ auth, onSelectRadio }) => {
                   <span>{radio.battery_level}%</span>
                 </div>
               </td>
+              {/* Historique button */}
+              <td style={tdStyle}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); navigate(`/radios/${radio.id}/history`); }}
+                  style={{
+                    padding: '6px 10px',
+                    backgroundColor: '#17a2b8',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Historique
+                </button>
+              </td>
               {auth?.user?.role === 'admin' && (
                 <td style={tdStyle}>
                   <button
@@ -332,7 +352,7 @@ const RadiosList = ({ auth, onSelectRadio }) => {
             ))
           ) : (
             <tr>
-              <td colSpan="6" style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+              <td colSpan={auth?.user?.role === 'admin' ? 7 : 6} style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
                 Aucune radio trouvée
               </td>
             </tr>
@@ -492,12 +512,14 @@ const thStyle = {
   textAlign: 'left',
   fontWeight: 'bold',
   color: '#333',
-  borderBottom: '2px solid #dee2e6'
+  borderBottom: '2px solid #dee2e6',
+  whiteSpace: 'nowrap'
 };
 
 const tdStyle = {
   padding: '12px 15px',
-  borderBottom: '1px solid #dee2e6'
+  borderBottom: '1px solid #dee2e6',
+  whiteSpace: 'nowrap'
 };
 
 export default RadiosList;

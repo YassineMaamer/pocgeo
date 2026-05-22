@@ -134,6 +134,41 @@ app.get('/api/radio-positions/:radioId', async (req, res) => {
   }
 });
 
+// GET history for a specific radio (positions/events)
+app.get('/api/radios/:id/history', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId, limit } = req.query;
+
+    // If a userId is provided and the user is a client, ensure they have access to this radio
+    if (userId) {
+      const userRes = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
+      if (userRes.rows.length > 0 && userRes.rows[0].role === 'client') {
+        const accessRes = await pool.query(
+          `
+            SELECT r.id FROM radios r
+            JOIN user_groups ug ON r.group_id = ug.group_id
+            WHERE r.id = $1 AND ug.user_id = $2
+          `,
+          [id, userId]
+        );
+        if (accessRes.rows.length === 0) {
+          return res.status(403).json({ error: 'Accès refusé à l\'historique de cette radio' });
+        }
+      }
+    }
+
+    const max = parseInt(limit, 10) || 100;
+    // Fetch positions/events for the radio, newest first
+    const histQuery = 'SELECT * FROM radio_positions WHERE radio_id = $1 ORDER BY id DESC LIMIT $2';
+    const histRes = await pool.query(histQuery, [id, max]);
+    res.json(histRes.rows);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Erreur du serveur');
+  }
+});
+
 app.get('/api/radios-by-group/:groupid', async (req, res) => {
   try {
     const { groupid } = req.params;

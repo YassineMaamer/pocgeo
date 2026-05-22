@@ -10,18 +10,25 @@ function DashboardHome({ auth }) {
 
   useEffect(() => {
     let canceled = false;
-
     const loadData = async () => {
       try {
         const baseUrl = 'http://localhost:5000/api';
+        const params = new URLSearchParams();
+        if (auth?.user?.id) params.append('userId', auth.user.id);
+
         const [radiosRes, groupsRes, positionsRes] = await Promise.all([
-          fetch(`${baseUrl}/radios`),
-          fetch(`${baseUrl}/groups`),
-          fetch(`${baseUrl}/radio-positions`),
+          fetch(`${baseUrl}/radios?${params.toString()}`),
+          fetch(`${baseUrl}/groups?${params.toString()}`),
+          fetch(`${baseUrl}/radio-positions?${params.toString()}`),
         ]);
 
-        if (!radiosRes.ok || !groupsRes.ok || !positionsRes.ok) {
-          throw new Error('Impossible de récupérer les données depuis le backend.');
+        // check responses
+        const errResp = [radiosRes, groupsRes, positionsRes].find(r => !r.ok);
+        if (errResp) {
+          const text = await errResp.text();
+          let msg = 'Impossible de récupérer les données depuis le backend.';
+          try { const j = JSON.parse(text); msg = j.error || j.message || msg; } catch(e) {}
+          throw new Error(msg);
         }
 
         const [radiosData, groupsData, positionsData] = await Promise.all([
@@ -34,6 +41,8 @@ function DashboardHome({ auth }) {
           setRadios(radiosData || []);
           setGroups(groupsData || []);
           setPositions(positionsData || []);
+          setError(null);
+          setLastUpdated(new Date());
           setLoading(false);
         }
       } catch (err) {
@@ -49,6 +58,39 @@ function DashboardHome({ auth }) {
       canceled = true;
     };
   }, []);
+
+  // Auto-refresh every 30s
+  useEffect(() => {
+    const iv = setInterval(() => {
+      // reuse effect's loader by calling a small wrapper fetch
+      (async () => {
+        try {
+          const baseUrl = 'http://localhost:5000/api';
+          const params = new URLSearchParams();
+          if (auth?.user?.id) params.append('userId', auth.user.id);
+          const [radiosRes, groupsRes, positionsRes] = await Promise.all([
+            fetch(`${baseUrl}/radios?${params.toString()}`),
+            fetch(`${baseUrl}/groups?${params.toString()}`),
+            fetch(`${baseUrl}/radio-positions?${params.toString()}`),
+          ]);
+          if (!radiosRes.ok || !groupsRes.ok || !positionsRes.ok) return;
+          const [radiosData, groupsData, positionsData] = await Promise.all([
+            radiosRes.json(), groupsRes.json(), positionsRes.json()
+          ]);
+          setRadios(radiosData || []);
+          setGroups(groupsData || []);
+          setPositions(positionsData || []);
+          setLastUpdated(new Date());
+        } catch (e) {
+          // silent
+        }
+      })();
+    }, 30000);
+
+    return () => clearInterval(iv);
+  }, [auth]);
+
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   const totalRadios = radios.length;
   const onlineRadios = radios.filter((radio) => {
@@ -124,6 +166,31 @@ function DashboardHome({ auth }) {
     },
   ];
 
+  const handleRefresh = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const baseUrl = 'http://localhost:5000/api';
+      const params = new URLSearchParams();
+      if (auth?.user?.id) params.append('userId', auth.user.id);
+      const [radiosRes, groupsRes, positionsRes] = await Promise.all([
+        fetch(`${baseUrl}/radios?${params.toString()}`),
+        fetch(`${baseUrl}/groups?${params.toString()}`),
+        fetch(`${baseUrl}/radio-positions?${params.toString()}`),
+      ]);
+      if (!radiosRes.ok || !groupsRes.ok || !positionsRes.ok) throw new Error('Erreur lors du rafraîchissement');
+      const [radiosData, groupsData, positionsData] = await Promise.all([radiosRes.json(), groupsRes.json(), positionsRes.json()]);
+      setRadios(radiosData || []);
+      setGroups(groupsData || []);
+      setPositions(positionsData || []);
+      setLastUpdated(new Date());
+    } catch (e) {
+      setError(e.message || 'Erreur');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ padding: '20px' }}>
@@ -152,6 +219,12 @@ function DashboardHome({ auth }) {
         <p style={{ margin: '12px 0 0', fontSize: '16px', maxWidth: '720px', lineHeight: '1.6', opacity: 0.92 }}>
           Bonjour {auth.user?.name || auth.user?.email}, les indicateurs et positions sont maintenant récupérés depuis le backend en temps réel.
         </p>
+        <div style={{ marginTop: '12px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button onClick={handleRefresh} style={{ padding: '8px 12px', borderRadius: '10px', background: 'white', color: '#0f172a', fontWeight: 700 }}>Rafraîchir</button>
+          <div style={{ opacity: 0.9 }}>
+            Dernière MAJ: {lastUpdated ? lastUpdated.toLocaleTimeString() : '—'}
+          </div>
+        </div>
       </div>
 
       {error && (

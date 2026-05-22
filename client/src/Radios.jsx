@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Edit, Trash2, Clock } from 'lucide-react';
 
 const RadiosList = ({ auth, onSelectRadio }) => {
   const [radios, setRadios] = useState([]);
@@ -22,7 +23,7 @@ const RadiosList = ({ auth, onSelectRadio }) => {
   const navigate = useNavigate();
 
   // Fetch radios
-  const fetchRadios = async () => {
+  const fetchRadios = useCallback(async () => {
     try {
       const userIdParam = auth?.user?.id ? `?userId=${auth.user.id}` : '';
       const response = await fetch(`http://localhost:5000/api/radios${userIdParam}`);
@@ -34,13 +35,13 @@ const RadiosList = ({ auth, onSelectRadio }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [auth?.user?.id]);
 
   useEffect(() => {
     fetchRadios();
-  }, []);
+  }, [fetchRadios]);
 
-  const fetchGroups = async () => {
+  const fetchGroups = useCallback(async () => {
     try {
       const userIdParam = auth?.user?.id ? `?userId=${auth.user.id}` : '';
       const response = await fetch(`http://localhost:5000/api/groups${userIdParam}`);
@@ -50,11 +51,11 @@ const RadiosList = ({ auth, onSelectRadio }) => {
     } catch (error) {
       console.error(error);
     }
-  };
+  }, [auth?.user?.id]);
 
   useEffect(() => {
     fetchGroups();
-  }, []);
+  }, [fetchGroups]);
 
   // Click handler
   const handleClick = (radio) => {
@@ -148,39 +149,23 @@ const RadiosList = ({ auth, onSelectRadio }) => {
   });
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h2 style={{ color: '#333', marginBottom: '20px' }}>Liste des Radios</h2>
+    <div className="premium-card" style={{ padding: '18px' }}>
+      <h2 style={{ color: 'var(--text-main)', marginBottom: '14px' }}>Liste des Radios</h2>
 
       {/* Search and Filters */}
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+      <div className="filters-row">
         <input
           type="text"
           placeholder="Rechercher par nom ou IMEI..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          style={{
-            flex: '1 1 250px',
-            padding: '10px 15px',
-            fontSize: '14px',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            boxSizing: 'border-box',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}
+          className="filter-input"
         />
 
         <select
           value={groupFilter}
           onChange={(e) => setGroupFilter(e.target.value)}
-          style={{
-            padding: '10px 15px',
-            fontSize: '14px',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            minWidth: '180px',
-            backgroundColor: 'white'
-          }}
+          className="filter-select"
         >
           <option value="">Tous les groupes</option>
           {groups.map(group => (
@@ -191,15 +176,7 @@ const RadiosList = ({ auth, onSelectRadio }) => {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          style={{
-            padding: '10px 15px',
-            fontSize: '14px',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            minWidth: '180px',
-            backgroundColor: 'white'
-          }}
+          className="filter-select"
         >
           <option value="">Tous les statuts</option>
           <option value="active">Active</option>
@@ -207,14 +184,8 @@ const RadiosList = ({ auth, onSelectRadio }) => {
         </select>
       </div>
 
-      <div style={{ overflowX: 'auto', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', width: '100%' }}>
-        <table
-          style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            minWidth: '900px', // Ensure horizontal scrolling for narrow views
-          }}
-        >
+      <div className="table-wrapper">
+        <table className="radio-table" style={{ minWidth: '780px' }}>
         <thead>
           <tr style={{ backgroundColor: '#f8f9fa' }}>
             <th style={thStyle}>Nom</th>
@@ -229,51 +200,37 @@ const RadiosList = ({ auth, onSelectRadio }) => {
 
         <tbody>
           {filteredRadios.length > 0 ? (
-            filteredRadios.map((radio, index) => (
+            filteredRadios.map((radio) => (
             <tr
               key={radio.id}
               onClick={() => handleClick(radio)}
-              style={{
-                cursor: 'pointer',
-                backgroundColor:
-                  selectedId === radio.id
-                    ? '#d0ebff' // 🔥 radio sélectionnée
-                    : index % 2 === 0
-                    ? '#ffffff'
-                    : '#f8f9fa',
-                transition: '0.2s'
-              }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(radio); } }}
+              tabIndex={0}
+              role="button"
+              aria-pressed={selectedId === radio.id}
+              className={selectedId === radio.id ? 'selected' : ''}
+              style={{ cursor: 'pointer', transition: '0.18s' }}
             >
               {/* Nom */}
-              <td style={tdStyle}>{radio.name}</td>
+              <td style={tdStyle} data-label="Nom">{radio.name}</td>
 
               {/* IMEI */}
-              <td style={tdStyle}>{radio.imei || '—'}</td>
+              <td style={tdStyle} data-label="IMEI">{radio.imei || '—'}</td>
 
               {/* Statut */}
-              <td style={tdStyle}>
-                <span
-                  style={{
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    fontSize: '0.9em',
-                    backgroundColor:
-                      radio.status === 'active' ? '#d4edda' : '#f8d7da',
-                    color:
-                      radio.status === 'active' ? '#155724' : '#721c24'
-                  }}
-                >
+              <td style={tdStyle} data-label="Statut">
+                <span className={`status-pill ${radio.status === 'active' ? 'active' : 'inactive'}`}>
                   {radio.status}
                 </span>
               </td>
               {/* Groupe */}
-              <td style={tdStyle}>
+              <td style={tdStyle} data-label="Groupe">
                 {groups.find((group) => group.id === radio.group_id)?.name || 'Inconnu'}
               </td>
 
 
               {/* Batterie */}
-              <td style={tdStyle}>
+              <td style={tdStyle} data-label="Batterie">
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   <div
                     style={{
@@ -285,66 +242,38 @@ const RadiosList = ({ auth, onSelectRadio }) => {
                       overflow: 'hidden'
                     }}
                   >
-                    <div
-                      style={{
-                        width: `${radio.battery_level}%`,
-                        height: '100%',
-                        backgroundColor:
-                          radio.battery_level > 50
-                            ? '#28a745'
-                            : radio.battery_level > 20
-                            ? '#ffc107'
-                            : '#dc3545'
-                      }}
-                    ></div>
+                        <div className="battery-fill" style={{ width: `${radio.battery_level}%`, backgroundColor: radio.battery_level > 50 ? '#28a745' : radio.battery_level > 20 ? '#ffc107' : '#dc3545' }} />
                   </div>
                   <span>{radio.battery_level}%</span>
                 </div>
               </td>
               {/* Historique button */}
-              <td style={tdStyle}>
+              <td style={tdStyle} data-label="Historique">
                 <button
                   onClick={(e) => { e.stopPropagation(); navigate(`/radios/${radio.id}/history`); }}
-                  style={{
-                    padding: '6px 10px',
-                    backgroundColor: '#17a2b8',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
+                  className="btn-info"
+                  aria-label={`Voir l'historique de ${radio.name}`}
                 >
-                  Historique
+                  <Clock size={16} className="icon" /> Historique
                 </button>
               </td>
               {auth?.user?.role === 'admin' && (
-                <td style={tdStyle}>
+                <td style={tdStyle} data-label="Actions">
                   <button
                     onClick={(e) => { e.stopPropagation(); handleEdit(radio); }}
-                    style={{
-                      padding: '6px 12px',
-                      marginRight: '5px',
-                      backgroundColor: '#007bff',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer'
-                    }}
+                    className="btn-primary"
+                    style={{ marginRight: '6px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                    aria-label={`Modifier ${radio.name}`}
                   >
-                    Modifier
+                    <Edit size={16} className="icon" /> Modifier
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDelete(radio.id); }}
-                    style={{
-                      padding: '6px 12px',
-                      backgroundColor: '#dc3545',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer'
-                    }}
+                    className="btn-danger"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                    aria-label={`Supprimer ${radio.name}`}
                   >
-                    Supprimer
+                    <Trash2 size={16} className="icon" /> Supprimer
                   </button>
                 </td>
               )}

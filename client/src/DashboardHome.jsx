@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Radio, Wifi, Users, AlertTriangle } from 'lucide-react';
+import io from 'socket.io-client';
 
 function DashboardHome({ auth }) {
   const [radios, setRadios] = useState([]);
@@ -27,7 +28,9 @@ function DashboardHome({ auth }) {
         if (errResp) {
           const text = await errResp.text();
           let msg = 'Impossible de récupérer les données depuis le backend.';
-          try { const j = JSON.parse(text); msg = j.error || j.message || msg; } catch(e) {}
+          let parsed = null;
+          try { parsed = JSON.parse(text); } catch (parseErr) { console.debug('parse error', parseErr && parseErr.message); }
+          if (parsed) msg = parsed.error || parsed.message || msg;
           throw new Error(msg);
         }
 
@@ -57,9 +60,41 @@ function DashboardHome({ auth }) {
     return () => {
       canceled = true;
     };
-  }, []);
+  }, [auth?.user?.id]);
 
   // Auto-refresh every 30s
+  // Socket.io connection for real-time updates
+  useEffect(() => {
+    const newSocket = io('http://localhost:5000');
+
+    newSocket.on('connect', () => {
+      console.log('Dashboard connected to server');
+      newSocket.emit('subscribeToRadios');
+    });
+
+    // Listen for radio status updates
+    newSocket.on('radioStatusUpdate', (updatedRadio) => {
+      console.log('Radio status updated:', updatedRadio);
+      setRadios(prevRadios =>
+        prevRadios.map(radio =>
+          radio.id === updatedRadio.id
+            ? {
+                ...radio,
+                status: updatedRadio.status,
+                battery_level: updatedRadio.battery_level,
+                last_seen: updatedRadio.last_seen
+              }
+            : radio
+        )
+      );
+      setLastUpdated(new Date());
+    });
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, [auth?.user?.id]);
+
   useEffect(() => {
     const iv = setInterval(() => {
       // reuse effect's loader by calling a small wrapper fetch
@@ -81,8 +116,8 @@ function DashboardHome({ auth }) {
           setGroups(groupsData || []);
           setPositions(positionsData || []);
           setLastUpdated(new Date());
-        } catch (e) {
-          // silent
+        } catch (_err) {
+          console.debug('refresh error', _err && _err.message);
         }
       })();
     }, 30000);
@@ -95,7 +130,7 @@ function DashboardHome({ auth }) {
   const totalRadios = radios.length;
   const onlineRadios = radios.filter((radio) => {
     if (typeof radio.status === 'string') {
-      return radio.status.toLowerCase() === 'online';
+      return radio.status.toLowerCase() === 'active';
     }
     return radio.is_online === true || radio.online === true;
   }).length;
@@ -106,26 +141,7 @@ function DashboardHome({ auth }) {
       (position.battery_level != null && position.battery_level < 25)
   ).length;
 
-  const monthlyActivity = useMemo(() => {
-    const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin'];
-    const counts = months.map(() => 0);
-
-    positions.forEach((position) => {
-      const dateValue = position.created_at || position.createdAt || position.timestamp || position.time;
-      const date = new Date(dateValue || Date.now());
-      const month = date.getMonth();
-      if (month >= 0 && month < 6) {
-        counts[month] += 1;
-      }
-    });
-
-    return months.map((label, index) => ({
-      label,
-      value: counts[index] || Math.floor(Math.random() * 22) + 18,
-    }));
-  }, [positions]);
-
-  const maxValue = Math.max(...monthlyActivity.map((item) => item.value), 1);
+  // monthlyActivity removed — simplified dashboard focuses on radio status
 
   const groupSummary = useMemo(() => {
     return groups
@@ -244,114 +260,137 @@ function DashboardHome({ auth }) {
 
       <div style={{ display: 'grid', gap: '18px', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', marginBottom: '24px' }}>
         {statCards.map((card) => (
-          <div
-            key={card.label}
-            style={{
-              background: 'white',
-              borderRadius: '22px',
-              padding: '22px',
-              boxShadow: '0 16px 40px rgba(15, 23, 42, 0.08)',
-              border: '1px solid rgba(15, 23, 42, 0.04)',
-            }}
-          >
+          <div key={card.label} className="premium-card stat-card">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
               <div>
                 <p style={{ margin: 0, color: '#6b7280', fontSize: '13px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{card.label}</p>
                 <h3 style={{ margin: '10px 0 0', fontSize: '32px', color: '#0f172a' }}>{card.value}</h3>
               </div>
-              <div
-                style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '16px',
-                  display: 'grid',
-                  placeItems: 'center',
-                  background: `${card.accent}22`,
-                  color: card.accent,
-                  fontSize: '20px',
-                }}
-              >
-                {card.icon}
-              </div>
+              <div style={{ width: '48px', height: '48px', borderRadius: '12px', display: 'grid', placeItems: 'center', background: `${card.accent}22`, color: card.accent, fontSize: '20px' }}>{card.icon}</div>
             </div>
-            <div style={{ height: '6px', background: '#e2e8f0', borderRadius: '999px', overflow: 'hidden' }}>
-              <div style={{ width: `${Math.min(100, Math.max(12, (card.value / Math.max(totalRadios, 1)) * 100))}%`, height: '100%', background: card.accent }} />
+            <div style={{ height: '6px', background: 'var(--border-color)', borderRadius: '999px', overflow: 'hidden', marginTop: '12px' }}>
+              <div style={{ width: `${Math.min(100, Math.max(8, (card.value / Math.max(totalRadios, 1)) * 100))}%`, height: '100%', background: card.accent }} />
             </div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '22px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gap: '22px', marginBottom: '24px' }}>
         <div style={{ background: 'white', borderRadius: '24px', padding: '24px', boxShadow: '0 20px 50px rgba(15, 23, 42, 0.08)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-            <div>
-              <h3 style={{ margin: '0 0 8px', fontSize: '22px', color: '#0f172a' }}>Activité mensuelle</h3>
-              <p style={{ margin: 0, color: '#6b7280' }}>Évolution du volume de positions détectées par mois.</p>
-            </div>
-            <span style={{ padding: '10px 16px', borderRadius: '999px', background: '#f8fafc', color: '#0f172a', fontWeight: 600 }}>Dernière mise à jour</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '14px', minHeight: '230px' }}>
-            {monthlyActivity.map((item) => (
-              <div key={item.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={{ width: '100%', background: '#e5e7eb', borderRadius: '16px 16px 0 0', overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      height: `${(item.value / maxValue) * 100}%`,
-                      background: 'linear-gradient(180deg, #2563eb 0%, #0ea5e9 100%)',
-                      borderRadius: '16px 16px 0 0',
-                      transition: 'height 0.35s ease',
-                    }}
-                  />
-                </div>
-                <span style={{ marginTop: '12px', fontSize: '13px', color: '#475569' }}>{item.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ background: 'white', borderRadius: '24px', padding: '24px', boxShadow: '0 20px 50px rgba(15, 23, 42, 0.08)' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '22px', color: '#0f172a' }}>Statut des radios</h3>
-          <div style={{ display: 'grid', gap: '14px' }}>
-            {[
-              { label: 'En ligne', value: onlineRadios || positions.length, color: '#22c55e' },
-              { label: 'Hors ligne', value: offlineRadios, color: '#ef4444' },
-            ].map((item) => (
-              <div
-                key={item.label}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px', borderRadius: '18px', background: '#f8fafc' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ width: '12px', height: '12px', borderRadius: '999px', background: item.color }} />
-                  <strong style={{ color: '#0f172a' }}>{item.label}</strong>
-                </div>
-                <span style={{ color: '#64748b', fontWeight: 700 }}>{item.value}</span>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ marginTop: '22px', height: '180px', display: 'grid', placeItems: 'center' }}>
-            <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-              <svg viewBox="0 0 220 220" preserveAspectRatio="xMidYMid meet" style={{ width: '70%', height: '70%' }}>
-                <circle cx="110" cy="110" r="90" fill="#f8fafc" />
-                <circle cx="110" cy="110" r="90" fill="transparent" stroke="#e2e8f0" strokeWidth="18" />
+          <h3 style={{ margin: '0 0 20px', fontSize: '22px', color: '#0f172a' }}>Statut des radios</h3>
+          
+          <div style={{ display: 'flex', gap: '32px', alignItems: 'center', justifyContent: 'space-between' }}>
+            {/* Donut Chart */}
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', position: 'relative', minHeight: '240px' }} className="donut-container">
+              <svg viewBox="0 0 280 280" className="donut-svg">
+                {/* Background circle */}
+                <circle cx="140" cy="140" r="110" fill="none" stroke="#e2e8f0" strokeWidth="22" />
+                
+                {/* Online segment */}
                 <circle
-                  cx="110"
-                  cy="110"
-                  r="90"
-                  fill="transparent"
+                  cx="140"
+                  cy="140"
+                  r="110"
+                  fill="none"
                   stroke="#22c55e"
-                  strokeWidth="18"
-                  strokeDasharray={`${Math.min(100, totalRadios ? Math.round((onlineRadios / totalRadios) * 100) : 0)} 100`}
+                  strokeWidth="22"
+                  strokeDasharray={`${totalRadios ? (onlineRadios / totalRadios) * 2 * Math.PI * 110 : 0} ${2 * Math.PI * 110}`}
                   strokeLinecap="round"
-                  transform="rotate(-90 110 110)"
+                  transform="rotate(-90 140 140)"
+                  style={{ transition: 'all 0.6s ease', filter: 'drop-shadow(0 4px 8px rgba(34, 197, 94, 0.2))' }}
                 />
-                <text x="110" y="112" textAnchor="middle" fontSize="28" fill="#0f172a" fontWeight="700">
-                  {totalRadios ? `${Math.round((onlineRadios / totalRadios) * 100)}%` : '0%'}
+                
+                {/* Offline segment */}
+                <circle
+                  cx="140"
+                  cy="140"
+                  r="110"
+                  fill="none"
+                  stroke="#ef4444"
+                  strokeWidth="22"
+                  strokeDasharray={`${totalRadios ? (offlineRadios / totalRadios) * 2 * Math.PI * 110 : 0} ${2 * Math.PI * 110}`}
+                  strokeDashoffset={`${totalRadios ? -(onlineRadios / totalRadios) * 2 * Math.PI * 110 : 0}`}
+                  strokeLinecap="round"
+                  transform="rotate(-90 140 140)"
+                  style={{ transition: 'all 0.6s ease', filter: 'drop-shadow(0 4px 8px rgba(239, 68, 68, 0.2))' }}
+                />
+                
+                {/* Center circle */}
+                <circle cx="140" cy="140" r="75" fill="white" />
+                
+                {/* Percentage text */}
+                <text x="140" y="130" textAnchor="middle" fontSize="42" fontWeight="bold" fill="#0f172a" style={{ transition: 'all 0.6s ease' }}>
+                  {totalRadios ? Math.round((onlineRadios / totalRadios) * 100) : 0}%
                 </text>
-                <text x="110" y="138" textAnchor="middle" fontSize="12" fill="#64748b">
-                  Radios en ligne
+                <text x="140" y="160" textAnchor="middle" fontSize="14" fill="#64748b">
+                  En ligne
                 </text>
               </svg>
+            </div>
+            
+            {/* Stats Cards */}
+            <div style={{ flex: 1, display: 'grid', gap: '16px' }} className="status-cards">
+              {/* Online Card */}
+              <div style={{
+                padding: '18px 20px',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
+                border: '2px solid #22c55e',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                  <div style={{
+                    width: '14px',
+                    height: '14px',
+                    borderRadius: '50%',
+                    backgroundColor: '#22c55e',
+                    animation: 'pulse 2s infinite'
+                  }} />
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#166534' }}>En ligne</span>
+                </div>
+                <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#15803d' }}>
+                  {onlineRadios}
+                </div>
+                <div style={{ fontSize: '12px', color: '#4d7c0f', marginTop: '4px' }}>
+                  {totalRadios ? Math.round((onlineRadios / totalRadios) * 100) : 0}% des radios
+                </div>
+              </div>
+              
+              {/* Offline Card */}
+              <div style={{
+                padding: '18px 20px',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                border: '2px solid #ef4444',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                  <div style={{
+                    width: '14px',
+                    height: '14px',
+                    borderRadius: '50%',
+                    backgroundColor: '#ef4444'
+                  }} />
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#7f1d1d' }}>Hors ligne</span>
+                </div>
+                <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#dc2626' }}>
+                  {offlineRadios}
+                </div>
+                <div style={{ fontSize: '12px', color: '#991b1b', marginTop: '4px' }}>
+                  {totalRadios ? Math.round((offlineRadios / totalRadios) * 100) : 0}% des radios
+                </div>
+              </div>
+              
+              {/* Total Card */}
+              <div style={{
+                padding: '18px 20px',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                border: '2px solid #3b82f6',
+              }}>
+                <span style={{ fontSize: '14px', fontWeight: '600', color: '#1e40af' }}>Total des radios</span>
+                <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#1e3a8a', marginTop: '4px' }}>
+                  {totalRadios}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -399,6 +438,105 @@ function DashboardHome({ auth }) {
           </div>
         </div>
       </div>
+
+      {/* Detailed Radio Status Section */}
+      <div style={{ background: 'white', borderRadius: '24px', padding: '24px', boxShadow: '0 20px 50px rgba(15, 23, 42, 0.08)', marginTop: '24px' }}>
+        <h3 style={{ margin: '0 0 20px', fontSize: '22px', color: '#0f172a' }}>Statut détaillé des radios</h3>
+        
+        {radios.length > 0 ? (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="radio-table">
+              <thead>
+                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                  <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 'bold', color: '#0f172a', fontSize: '13px', textTransform: 'uppercase' }}>Nom</th>
+                  <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 'bold', color: '#0f172a', fontSize: '13px', textTransform: 'uppercase' }}>IMEI</th>
+                  <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 'bold', color: '#0f172a', fontSize: '13px', textTransform: 'uppercase' }}>Statut</th>
+                  <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 'bold', color: '#0f172a', fontSize: '13px', textTransform: 'uppercase' }}>Batterie</th>
+                  <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 'bold', color: '#0f172a', fontSize: '13px', textTransform: 'uppercase' }}>Groupe</th>
+                </tr>
+              </thead>
+              <tbody>
+                {radios.map((radio, index) => {
+                  const isOnline = radio.status?.toLowerCase() === 'active';
+                  return (
+                    <tr 
+                      key={radio.id} 
+                      style={{ 
+                        borderBottom: '1px solid #e2e8f0',
+                        backgroundColor: index % 2 === 0 ? '#ffffff' : '#f9fafb'
+                      }}
+                    >
+                      <td style={{ padding: '14px 16px', color: '#0f172a', fontWeight: '500' }}>
+                        {radio.name || 'Sans nom'}
+                      </td>
+                      <td style={{ padding: '14px 16px', color: '#64748b', fontSize: '13px' }}>
+                        {radio.imei || '—'}
+                      </td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div
+                            style={{
+                              width: '10px',
+                              height: '10px',
+                              borderRadius: '50%',
+                              backgroundColor: isOnline ? '#22c55e' : '#ef4444',
+                              animation: isOnline ? 'pulse 2s infinite' : 'none'
+                            }}
+                          />
+                          <span style={{ color: isOnline ? '#22c55e' : '#ef4444', fontWeight: '600', fontSize: '13px' }}>
+                            {isOnline ? 'En ligne' : 'Hors ligne'}
+                          </span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100px' }}>
+                          <div
+                            style={{
+                              flex: 1,
+                              height: '6px',
+                              backgroundColor: '#e2e8f0',
+                              borderRadius: '3px',
+                              overflow: 'hidden'
+                            }}
+                          >
+                            <div
+                              style={{
+                                height: '100%',
+                                width: `${radio.battery_level || 0}%`,
+                                backgroundColor:
+                                  (radio.battery_level || 0) > 50
+                                    ? '#22c55e'
+                                    : (radio.battery_level || 0) > 20
+                                    ? '#ffc107'
+                                    : '#ef4444'
+                              }}
+                            />
+                          </div>
+                          <span style={{ fontSize: '12px', color: '#64748b', minWidth: '35px' }}>
+                            {radio.battery_level || 0}%
+                          </span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '14px 16px', color: '#64748b', fontSize: '13px' }}>
+                        {groups.find(g => g.id === radio.group_id)?.name || 'Aucun'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p style={{ margin: 0, color: '#64748b', textAlign: 'center', padding: '24px' }}>Aucune radio disponible</p>
+        )}
+      </div>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+      `}</style>
     </div>
   );
 }

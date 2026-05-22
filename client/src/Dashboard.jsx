@@ -198,7 +198,7 @@ function Dashboard({ auth, onLogout }) {
       {isMapVisible && (
         <div
           style={{
-            width: '35%',
+            width: '45%',
             transition: 'width 0.3s ease',
             borderLeft: '1px solid #e2e8f0',
           }}
